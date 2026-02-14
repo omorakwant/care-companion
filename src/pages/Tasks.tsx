@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,17 +37,19 @@ type Patient = Tables<"patients">;
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 type TaskPriority = Database["public"]["Enums"]["task_priority"];
 
-const priorityStyles: Record<TaskPriority, string> = {
-  low: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
-  medium: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
-  high: "bg-destructive/15 text-destructive",
-};
+const statusFilters = [
+  { label: "All", value: "all" },
+  { label: "Pending", value: "pending" },
+  { label: "In Progress", value: "in_progress" },
+  { label: "Completed", value: "completed" },
+] as const;
 
-const statusStyles: Record<TaskStatus, string> = {
-  pending: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
-  in_progress: "bg-primary/15 text-primary",
-  completed: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
-};
+const priorityFilters = [
+  { label: "All", value: "all" },
+  { label: "High", value: "high" },
+  { label: "Medium", value: "medium" },
+  { label: "Low", value: "low" },
+] as const;
 
 export default function Tasks() {
   const { user } = useAuth();
@@ -124,7 +126,6 @@ export default function Tasks() {
       return;
     }
     toast.success(`Task marked as ${status.replace("_", " ")}`);
-    // Update selected task immediately for instant feedback
     if (selectedTask?.id === id) {
       setSelectedTask((prev) => (prev ? { ...prev, status } : null));
     }
@@ -139,11 +140,84 @@ export default function Tasks() {
     return true;
   });
 
+  const columns: Column<Task>[] = [
+    {
+      key: "priority",
+      header: "",
+      className: "w-10 text-center",
+      render: (task) => (
+        <StatusBadge type="priority" value={task.priority} dotOnly />
+      ),
+    },
+    {
+      key: "title",
+      header: "Title",
+      render: (task) => (
+        <span className="font-medium text-sm">{task.title}</span>
+      ),
+    },
+    {
+      key: "patient",
+      header: "Patient",
+      render: (task) => (
+        <span className="text-sm text-muted-foreground">
+          {task.patients?.name ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "category",
+      header: "Category",
+      render: (task) => (
+        <span className="text-sm text-muted-foreground">
+          {task.category ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (task) => <StatusBadge type="status" value={task.status} />,
+    },
+    {
+      key: "created",
+      header: "Created",
+      render: (task) => (
+        <span className="text-sm text-muted-foreground">
+          {new Date(task.created_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "w-[140px]",
+      render: (task) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Select
+            value={task.status}
+            onValueChange={(v) => updateStatus(task.id, v as TaskStatus)}
+          >
+            <SelectTrigger className="w-[130px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <AppLayout title="Tasks">
       <div className="space-y-4">
+        {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search tasks..."
@@ -152,188 +226,138 @@ export default function Tasks() {
               className="pl-9"
             />
           </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" /> New Task
+
+          {/* Status filter pills */}
+          <div className="flex items-center rounded-md border overflow-hidden">
+            {statusFilters.map((f) => (
+              <Button
+                key={f.value}
+                size="sm"
+                variant={filterStatus === f.value ? "default" : "outline"}
+                className="rounded-none border-0 h-8 px-3 text-xs"
+                onClick={() => setFilterStatus(f.value)}
+              >
+                {f.label}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Title *</Label>
-                  <Input
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm({ ...form, title: e.target.value })
-                    }
-                    required
-                    placeholder="e.g. Administer medication"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    rows={3}
-                    placeholder="Task details..."
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+            ))}
+          </div>
+
+          {/* Priority filter pills */}
+          <div className="flex items-center rounded-md border overflow-hidden">
+            {priorityFilters.map((f) => (
+              <Button
+                key={f.value}
+                size="sm"
+                variant={filterPriority === f.value ? "default" : "outline"}
+                className="rounded-none border-0 h-8 px-3 text-xs"
+                onClick={() => setFilterPriority(f.value)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="ml-auto">
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> New Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Task</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreate} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Priority</Label>
+                    <Label>Title *</Label>
+                    <Input
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm({ ...form, title: e.target.value })
+                      }
+                      required
+                      placeholder="e.g. Administer medication"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm({ ...form, description: e.target.value })
+                      }
+                      rows={3}
+                      placeholder="Task details..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Priority</Label>
+                      <Select
+                        value={form.priority}
+                        onValueChange={(v) =>
+                          setForm({ ...form, priority: v as TaskPriority })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Input
+                        value={form.category}
+                        onChange={(e) =>
+                          setForm({ ...form, category: e.target.value })
+                        }
+                        placeholder="e.g. Medication"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Patient (optional)</Label>
                     <Select
-                      value={form.priority}
+                      value={form.patient_id}
                       onValueChange={(v) =>
-                        setForm({ ...form, priority: v as TaskPriority })
+                        setForm({ ...form, patient_id: v })
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select a patient..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
+                        {patients.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Input
-                      value={form.category}
-                      onChange={(e) =>
-                        setForm({ ...form, category: e.target.value })
-                      }
-                      placeholder="e.g. Medication"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Patient (optional)</Label>
-                  <Select
-                    value={form.patient_id}
-                    onValueChange={(v) =>
-                      setForm({ ...form, patient_id: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a patient..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patients.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full">
-                  Create Task
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <Button type="submit" className="w-full">
+                    Create Task
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <ListTodo className="w-10 h-10 mb-2" />
-              <p>No tasks found</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map((task) => (
-              <Card
-                key={task.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => setSelectedTask(task)}
-              >
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium truncate">{task.title}</h3>
-                      <Badge
-                        variant="outline"
-                        className={priorityStyles[task.priority]}
-                      >
-                        {task.priority}
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className={statusStyles[task.status]}
-                      >
-                        {task.status.replace("_", " ")}
-                      </Badge>
-                    </div>
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground truncate">
-                        {task.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {task.patients?.name && (
-                        <span>Patient: {task.patients.name}</span>
-                      )}
-                      {task.category && <span>· {task.category}</span>}
-                      <span>
-                        · {new Date(task.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Select
-                      value={task.status}
-                      onValueChange={(v) =>
-                        updateStatus(task.id, v as TaskStatus)
-                      }
-                    >
-                      <SelectTrigger className="w-[130px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        {/* Data Table */}
+        <DataTable<Task>
+          columns={columns}
+          data={filtered}
+          onRowClick={(task) => setSelectedTask(task)}
+          emptyIcon={<ListTodo className="w-10 h-10" />}
+          emptyMessage="No tasks found"
+        />
 
         {/* Task Detail Sheet */}
         <Sheet
@@ -351,18 +375,11 @@ export default function Tasks() {
                 <div className="mt-6 space-y-5">
                   {/* Status & Priority */}
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={priorityStyles[selectedTask.priority]}
-                    >
-                      {selectedTask.priority} priority
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={statusStyles[selectedTask.status]}
-                    >
-                      {selectedTask.status.replace("_", " ")}
-                    </Badge>
+                    <StatusBadge
+                      type="priority"
+                      value={selectedTask.priority}
+                    />
+                    <StatusBadge type="status" value={selectedTask.status} />
                   </div>
 
                   {/* Description */}

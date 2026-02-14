@@ -165,6 +165,75 @@ export type Database = {
         }
         Relationships: []
       }
+      handoff_reports: {
+        Row: {
+          id: string
+          patient_id: string
+          author_id: string
+          audio_notice_id: string | null
+          shift_type: Database["public"]["Enums"]["shift_type"]
+          summary_text: string
+          pain_level: number | null
+          consciousness: string | null
+          pending_labs: string[]
+          access_lines: string[]
+          risk_factors: string[]
+          to_do_items: string[]
+          transcript_excerpt: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          author_id: string
+          audio_notice_id?: string | null
+          shift_type?: Database["public"]["Enums"]["shift_type"]
+          summary_text?: string
+          pain_level?: number | null
+          consciousness?: string | null
+          pending_labs?: string[]
+          access_lines?: string[]
+          risk_factors?: string[]
+          to_do_items?: string[]
+          transcript_excerpt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          author_id?: string
+          audio_notice_id?: string | null
+          shift_type?: Database["public"]["Enums"]["shift_type"]
+          summary_text?: string
+          pain_level?: number | null
+          consciousness?: string | null
+          pending_labs?: string[]
+          access_lines?: string[]
+          risk_factors?: string[]
+          to_do_items?: string[]
+          transcript_excerpt?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handoff_reports_audio_notice_id_fkey"
+            columns: ["audio_notice_id"]
+            isOneToOne: false
+            referencedRelation: "audio_notices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handoff_reports_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -266,6 +335,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "receptionist" | "staff"
       bed_status: "available" | "occupied" | "maintenance"
+      shift_type: "day" | "night"
       task_priority: "low" | "medium" | "high"
       task_status: "pending" | "in_progress" | "completed"
     }
@@ -397,6 +467,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "receptionist", "staff"],
       bed_status: ["available", "occupied", "maintenance"],
+      shift_type: ["day", "night"],
       task_priority: ["low", "medium", "high"],
       task_status: ["pending", "in_progress", "completed"],
     },

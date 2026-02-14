@@ -10,7 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import PatientDetail from "./pages/PatientDetail";
 import Beds from "./pages/Beds";
-import Tasks from "./pages/Tasks";
+import Handoff from "./pages/Handoff";
 import Recordings from "./pages/Recordings";
 import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/patients" element={<ProtectedRoute><Patients /></ProtectedRoute>} />
             <Route path="/patients/:id" element={<ProtectedRoute><PatientDetail /></ProtectedRoute>} />
             <Route path="/beds" element={<ProtectedRoute><Beds /></ProtectedRoute>} />
-            <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
+            <Route path="/handoff" element={<ProtectedRoute><Handoff /></ProtectedRoute>} />
             <Route path="/recordings" element={<ProtectedRoute><Recordings /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

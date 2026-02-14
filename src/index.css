@@ -6,96 +6,96 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    --background: 220 14% 97%;
+    --foreground: 220 20% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 220 20% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 220 20% 14%;
 
-    --primary: 199 89% 48%;
+    --primary: 205 80% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 95%;
-    --secondary-foreground: 215 25% 15%;
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 220 20% 14%;
 
-    --muted: 210 15% 93%;
-    --muted-foreground: 215 12% 50%;
+    --muted: 220 12% 92%;
+    --muted-foreground: 220 10% 46%;
 
-    --accent: 168 71% 39%;
+    --accent: 168 60% 38%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 89%;
-    --input: 214 20% 89%;
-    --ring: 199 89% 48%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 205 80% 45%;
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 215 25% 15%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 199 89% 55%;
+    --sidebar-background: 218 30% 12%;
+    --sidebar-foreground: 220 15% 88%;
+    --sidebar-primary: 205 80% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 20% 22%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 215 18% 25%;
-    --sidebar-ring: 199 89% 55%;
+    --sidebar-accent: 218 25% 18%;
+    --sidebar-accent-foreground: 220 15% 88%;
+    --sidebar-border: 218 22% 22%;
+    --sidebar-ring: 205 80% 52%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --success: 152 69% 39%;
+    --success: 152 69% 36%;
     --success-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 205 80% 45%;
     --info-foreground: 0 0% 100%;
   }
 
   .dark {
-    --background: 215 25% 10%;
-    --foreground: 210 20% 95%;
+    --background: 220 20% 8%;
+    --foreground: 220 15% 93%;
 
-    --card: 215 25% 13%;
-    --card-foreground: 210 20% 95%;
+    --card: 220 20% 11%;
+    --card-foreground: 220 15% 93%;
 
-    --popover: 215 25% 13%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 220 20% 11%;
+    --popover-foreground: 220 15% 93%;
 
-    --primary: 199 89% 55%;
+    --primary: 205 80% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 20% 18%;
-    --secondary-foreground: 210 20% 95%;
+    --secondary: 220 18% 16%;
+    --secondary-foreground: 220 15% 93%;
 
-    --muted: 215 18% 20%;
-    --muted-foreground: 215 12% 60%;
+    --muted: 220 16% 18%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 168 71% 45%;
+    --accent: 168 60% 42%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 18% 22%;
-    --input: 215 18% 22%;
-    --ring: 199 89% 55%;
+    --border: 220 16% 18%;
+    --input: 220 16% 18%;
+    --ring: 205 80% 52%;
 
-    --sidebar-background: 215 28% 8%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 199 89% 55%;
+    --sidebar-background: 220 25% 6%;
+    --sidebar-foreground: 220 15% 88%;
+    --sidebar-primary: 205 80% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 20% 15%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 215 18% 18%;
-    --sidebar-ring: 199 89% 55%;
+    --sidebar-accent: 220 20% 13%;
+    --sidebar-accent-foreground: 220 15% 88%;
+    --sidebar-border: 220 16% 15%;
+    --sidebar-ring: 205 80% 52%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --success: 152 69% 45%;
+    --success: 152 69% 42%;
     --success-foreground: 0 0% 100%;
-    --info: 199 89% 55%;
+    --info: 205 80% 52%;
     --info-foreground: 0 0% 100%;
   }
 }
@@ -106,11 +106,13 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv11", "ss01";
+    font-weight: 400;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: -0.01em;
   }
 }

@@ -1,81 +1,74 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/StatCard";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Users,
   BedDouble,
-  ListTodo,
+  ClipboardList,
   Mic,
   ArrowRight,
-  Clock,
-  User,
-  Sparkles,
+  Plus,
+  Moon,
+  Sun,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { Tables } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
 
-type Task = Tables<"tasks"> & { patients?: { name: string } | null };
+type HandoffReport = Tables<"handoff_reports"> & {
+  patients?: { name: string } | null;
+};
 type AudioNotice = Tables<"audio_notices"> & {
   patients?: { name: string } | null;
 };
 
-const priorityStyles: Record<string, string> = {
-  low: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
-  medium: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
-  high: "bg-destructive/15 text-destructive",
-};
-
-const statusStyles: Record<string, string> = {
-  pending: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
-  in_progress: "bg-primary/15 text-primary",
-  completed: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
-};
-
 export default function Dashboard() {
-  const { role } = useAuth();
+  const { role, profile } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     patients: 0,
     beds: 0,
     availableBeds: 0,
-    tasks: 0,
+    handoffs: 0,
     recordings: 0,
     unprocessed: 0,
   });
-  const [recentTasks, setRecentTasks] = useState<Task[]>([]);
+  const [recentHandoffs, setRecentHandoffs] = useState<HandoffReport[]>([]);
   const [recentRecordings, setRecentRecordings] = useState<AudioNotice[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [p, b, t, r, unprocessed, tasks, recordings] = await Promise.all([
-        supabase.from("patients").select("id", { count: "exact", head: true }),
-        supabase.from("beds").select("id", { count: "exact", head: true }),
-        supabase
-          .from("tasks")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending"),
-        supabase
-          .from("audio_notices")
-          .select("id", { count: "exact", head: true }),
-        supabase
-          .from("audio_notices")
-          .select("id", { count: "exact", head: true })
-          .eq("processed", false),
-        supabase
-          .from("tasks")
-          .select("*, patients(name)")
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("audio_notices")
-          .select("*, patients(name)")
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
+      const [p, b, h, r, unprocessed, handoffs, recordings] =
+        await Promise.all([
+          supabase
+            .from("patients")
+            .select("id", { count: "exact", head: true }),
+          supabase.from("beds").select("id", { count: "exact", head: true }),
+          supabase
+            .from("handoff_reports")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("audio_notices")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("audio_notices")
+            .select("id", { count: "exact", head: true })
+            .eq("processed", false),
+          supabase
+            .from("handoff_reports")
+            .select("*, patients(name)")
+            .order("created_at", { ascending: false })
+            .limit(5),
+          supabase
+            .from("audio_notices")
+            .select("*, patients(name)")
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
 
       const availableBeds = await supabase
         .from("beds")
@@ -86,228 +79,223 @@ export default function Dashboard() {
         patients: p.count ?? 0,
         beds: b.count ?? 0,
         availableBeds: availableBeds.count ?? 0,
-        tasks: t.count ?? 0,
+        handoffs: h.count ?? 0,
         recordings: r.count ?? 0,
         unprocessed: unprocessed.count ?? 0,
       });
-      if (tasks.data) setRecentTasks(tasks.data as Task[]);
+      if (handoffs.data)
+        setRecentHandoffs(handoffs.data as HandoffReport[]);
       if (recordings.data)
         setRecentRecordings(recordings.data as AudioNotice[]);
     };
     fetchData();
   }, []);
 
-  const cards = [
-    {
-      title: "Patients",
-      value: stats.patients,
-      subtitle: "Total registered",
-      icon: Users,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      path: "/patients",
-    },
-    {
-      title: "Beds Available",
-      value: `${stats.availableBeds}/${stats.beds}`,
-      subtitle: "Available / Total",
-      icon: BedDouble,
-      color: "text-accent",
-      bgColor: "bg-accent/10",
-      path: "/beds",
-    },
-    {
-      title: "Pending Tasks",
-      value: stats.tasks,
-      subtitle: "Awaiting action",
-      icon: ListTodo,
-      color: "text-[hsl(var(--warning))]",
-      bgColor: "bg-[hsl(var(--warning))]/10",
-      path: "/tasks",
-    },
-    {
-      title: "Recordings",
-      value: stats.recordings,
-      subtitle: stats.unprocessed > 0
-        ? `${stats.unprocessed} unprocessed`
-        : "All processed",
-      icon: Mic,
-      color: "text-destructive",
-      bgColor: "bg-destructive/10",
-      path: "/recordings",
-    },
-  ];
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
+  };
 
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6">
+        {/* Greeting */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <p className="text-muted-foreground">
-            Welcome to CareFlow — your hospital operations at a glance.
-          </p>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">
+              {greeting()}, {profile?.display_name ?? "Nurse"}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </p>
+          </div>
           {(role === "admin" || role === "staff") && (
             <Button
               onClick={() => navigate("/recordings")}
               className="gap-2"
-              size="lg"
             >
-              <Mic className="w-4 h-4" />
-              Record & Generate Tasks
-              <Sparkles className="w-3.5 h-3.5" />
+              <Mic className="w-4 h-4" /> Record Shift Handoff
             </Button>
           )}
         </div>
 
         {/* Stat Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {cards.map((card) => (
-            <Card
-              key={card.title}
-              className="hover:shadow-md transition-shadow cursor-pointer group"
-              onClick={() => navigate(card.path)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {card.title}
-                </CardTitle>
-                <div
-                  className={`w-8 h-8 rounded-lg ${card.bgColor} flex items-center justify-center`}
-                >
-                  <card.icon className={`w-4 h-4 ${card.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{card.value}</div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  {card.subtitle}
-                  <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+          <StatCard
+            title="Patients"
+            value={stats.patients}
+            subtitle="Active patients"
+            icon={Users}
+            onClick={() => navigate("/patients")}
+          />
+          <StatCard
+            title="Beds Available"
+            value={`${stats.availableBeds} / ${stats.beds}`}
+            subtitle="Available / Total"
+            icon={BedDouble}
+            onClick={() => navigate("/beds")}
+          />
+          <StatCard
+            title="Handoff Reports"
+            value={stats.handoffs}
+            subtitle="Total shift handoffs"
+            icon={ClipboardList}
+            onClick={() => navigate("/handoff")}
+          />
+          <StatCard
+            title="Recordings"
+            value={stats.recordings}
+            subtitle={
+              stats.unprocessed > 0
+                ? `${stats.unprocessed} unprocessed`
+                : "All processed"
+            }
+            icon={Mic}
+            onClick={() => navigate("/recordings")}
+          />
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Tasks */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Recent Tasks</CardTitle>
-                <button
-                  onClick={() => navigate("/tasks")}
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  View all <ArrowRight className="w-3 h-3" />
-                </button>
+        {/* Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-5">
+          {/* Recent Handoff Reports -- wider */}
+          <div className="lg:col-span-3 bg-card border rounded-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="text-sm font-semibold">Recent Handoff Reports</h3>
+              <button
+                onClick={() => navigate("/handoff")}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                View all <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+            {recentHandoffs.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No handoff reports yet
               </div>
-            </CardHeader>
-            <CardContent>
-              {recentTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No tasks yet
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {recentTasks.map((task) => (
+            ) : (
+              <div className="divide-y">
+                {recentHandoffs.map((report) => {
+                  const risks = (report.risk_factors as string[]) ?? [];
+                  return (
                     <div
-                      key={task.id}
-                      className="flex items-center gap-3 group cursor-pointer"
-                      onClick={() => navigate("/tasks")}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {task.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] px-1.5 py-0 ${priorityStyles[task.priority]}`}
-                          >
-                            {task.priority}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] px-1.5 py-0 ${statusStyles[task.status]}`}
-                          >
-                            {task.status.replace("_", " ")}
-                          </Badge>
-                          {task.patients?.name && (
-                            <span className="text-[10px] text-muted-foreground">
-                              · {task.patients.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {new Date(task.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Recordings */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Recent Recordings</CardTitle>
-                {(role === "admin" || role === "staff") && (
-                  <button
-                    onClick={() => navigate("/recordings")}
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                  >
-                    View all <ArrowRight className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {recentRecordings.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No recordings yet
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {recentRecordings.map((rec) => (
-                    <div
-                      key={rec.id}
-                      className="flex items-center gap-3 cursor-pointer"
+                      key={report.id}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() =>
-                        (role === "admin" || role === "staff") &&
-                        navigate("/recordings")
+                        navigate(
+                          `/handoff?patient=${report.patient_id}`
+                        )
                       }
                     >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          rec.processed
-                            ? "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]"
-                            : "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]"
-                        }`}
-                      >
-                        <Mic className="w-3.5 h-3.5" />
-                      </div>
+                      {report.shift_type === "night" ? (
+                        <Moon className="w-4 h-4 text-indigo-500 shrink-0" />
+                      ) : (
+                        <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {rec.patients?.name ?? "Unknown Patient"}
+                          {report.patients?.name ?? "Unknown Patient"}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {rec.processed ? "Processed" : "Awaiting processing"}
-                          {rec.duration_seconds != null &&
-                            ` · ${Math.floor(rec.duration_seconds / 60)}:${(rec.duration_seconds % 60).toString().padStart(2, "0")}`}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {report.summary_text?.slice(0, 80)}...
                         </p>
                       </div>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {new Date(rec.created_at).toLocaleDateString()}
+                      {risks.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-medium shrink-0">
+                          <AlertTriangle className="w-3 h-3" />
+                          {risks.length}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                        {new Date(report.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Recordings */}
+          <div className="lg:col-span-2 bg-card border rounded-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h3 className="text-sm font-semibold">Recent Recordings</h3>
+            </div>
+            {recentRecordings.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No recordings yet
+              </div>
+            ) : (
+              <div className="divide-y">
+                {recentRecordings.map((rec) => (
+                  <div
+                    key={rec.id}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted/30 cursor-pointer transition-colors"
+                    onClick={() =>
+                      (role === "admin" || role === "staff") &&
+                      navigate("/recordings")
+                    }
+                  >
+                    <div
+                      className={cn(
+                        "w-2 h-2 rounded-full shrink-0",
+                        rec.processed ? "bg-emerald-500" : "bg-amber-500"
+                      )}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {rec.patients?.name ?? "Unknown Patient"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {rec.processed ? "Processed" : "Processing..."}
+                        {rec.duration_seconds != null &&
+                          ` -- ${Math.floor(rec.duration_seconds / 60)}:${(rec.duration_seconds % 60).toString().padStart(2, "0")}`}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground shrink-0">
+                      {new Date(rec.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="flex gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/patients")}
+            className="gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Patient
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/handoff")}
+            className="gap-1.5"
+          >
+            <ClipboardList className="w-3.5 h-3.5" /> View Handoffs
+          </Button>
+          {(role === "admin" || role === "staff") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/recordings")}
+              className="gap-1.5"
+            >
+              <Mic className="w-3.5 h-3.5" /> Record Handoff
+            </Button>
+          )}
         </div>
       </div>
     </AppLayout>

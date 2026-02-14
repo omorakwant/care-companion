@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { HandoffCard } from "@/components/HandoffCard";
 import {
   Select,
   SelectContent,
@@ -24,18 +23,16 @@ import {
   Mic,
   MicOff,
   Upload,
-  Clock,
   Loader2,
   CheckCircle2,
   AlertCircle,
   Play,
   Pause,
-  User,
-  ListTodo,
+  FileText,
   ChevronDown,
   ChevronRight,
   Languages,
-  Sparkles,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
@@ -44,20 +41,23 @@ type Patient = Tables<"patients">;
 type AudioNotice = Tables<"audio_notices"> & {
   patients?: { name: string } | null;
 };
-type Task = Tables<"tasks">;
-
-const priorityStyles: Record<string, string> = {
-  low: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
-  medium: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
-  high: "bg-destructive/15 text-destructive",
-};
+type HandoffReport = Tables<"handoff_reports">;
 
 const langLabels: Record<string, string> = {
+  en: "English",
   eng: "English",
+  fr: "French",
   fra: "French",
   fre: "French",
+  ar: "Arabic",
   ara: "Arabic",
   arb: "Arabic",
+  es: "Spanish",
+  de: "German",
+  it: "Italian",
+  nl: "Dutch",
+  pt: "Portuguese",
+  is: "Icelandic",
 };
 
 export default function Recordings() {
@@ -67,12 +67,11 @@ export default function Recordings() {
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [recordings, setRecordings] = useState<AudioNotice[]>([]);
-  const [tasksByRecording, setTasksByRecording] = useState<
-    Record<string, Task[]>
+  const [reportsByRecording, setReportsByRecording] = useState<
+    Record<string, HandoffReport[]>
   >({});
-  const [selectedPatient, setSelectedPatient] = useState<string>(
-    preselectedPatient
-  );
+  const [selectedPatient, setSelectedPatient] =
+    useState<string>(preselectedPatient);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -96,7 +95,31 @@ export default function Recordings() {
         if (data) setPatients(data as Patient[]);
       });
     fetchRecordings();
+
+    const audioChannel = supabase
+      .channel("audio-realtime")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "audio_notices" },
+        (payload) => {
+          const updated = payload.new as AudioNotice;
+          if (updated.processed) {
+            fetchRecordings();
+            toast.success("AI processing complete — handoff report generated!");
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "handoff_reports" },
+        () => {
+          fetchRecordings();
+        }
+      )
+      .subscribe();
+
     return () => {
+      supabase.removeChannel(audioChannel);
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
@@ -110,29 +133,25 @@ export default function Recordings() {
       .limit(50);
     if (data) {
       setRecordings(data as AudioNotice[]);
-      // Fetch tasks for all recordings
       const ids = data.map((r) => r.id);
       if (ids.length > 0) {
-        const { data: tasks } = await supabase
-          .from("tasks")
+        const { data: reports } = await supabase
+          .from("handoff_reports")
           .select("*")
-          .in("audio_notice_id", ids)
-          .order("priority", { ascending: false });
-        if (tasks) {
-          const grouped: Record<string, Task[]> = {};
-          tasks.forEach((t) => {
-            if (t.audio_notice_id) {
-              if (!grouped[t.audio_notice_id]) grouped[t.audio_notice_id] = [];
-              grouped[t.audio_notice_id].push(t);
+          .in("audio_notice_id", ids);
+        if (reports) {
+          const grouped: Record<string, HandoffReport[]> = {};
+          reports.forEach((r) => {
+            if (r.audio_notice_id) {
+              if (!grouped[r.audio_notice_id]) grouped[r.audio_notice_id] = [];
+              grouped[r.audio_notice_id].push(r);
             }
           });
-          setTasksByRecording(grouped);
+          setReportsByRecording(grouped);
         }
       }
     }
   };
-
-  // ─── Recording controls ──────────────────────────────────────
 
   const startRecording = async () => {
     try {
@@ -179,9 +198,7 @@ export default function Recordings() {
     setRecordingTime(0);
   };
 
-  // ─── Upload & Process (one flow) ────────────────────────────
-
-  const uploadAndProcess = async () => {
+  const uploadRecording = async () => {
     if (!audioBlob || !selectedPatient || !user) return;
     setUploading(true);
 
@@ -213,45 +230,69 @@ export default function Recordings() {
       return;
     }
 
-    toast.success("Uploaded! AI is transcribing & generating tasks...");
+    toast.success("Uploaded! AI processing automatically...");
     discardRecording();
     setUploading(false);
+
+    if (insertData) {
+      setProcessing(insertData.id);
+      setExpandedRec(insertData.id);
+    }
     fetchRecordings();
 
-    // Trigger AI processing
     if (insertData) {
-      processAudio(insertData.id);
+      pollForCompletion(insertData.id);
     }
   };
 
-  const processAudio = async (audioNoticeId: string) => {
+  const pollForCompletion = async (audioNoticeId: string) => {
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const { data } = await supabase
+        .from("audio_notices")
+        .select("processed")
+        .eq("id", audioNoticeId)
+        .single();
+      if (data?.processed) {
+        setProcessing(null);
+        fetchRecordings();
+        return;
+      }
+    }
+    setProcessing(null);
+    fetchRecordings();
+  };
+
+  const retryProcessing = async (audioNoticeId: string) => {
     setProcessing(audioNoticeId);
     setExpandedRec(audioNoticeId);
+    toast.info("Retrying AI processing...");
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "process-audio",
-        { body: { audio_notice_id: audioNoticeId } }
+      const session = (await supabase.auth.getSession()).data.session;
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-audio`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ audio_notice_id: audioNoticeId }),
+        }
       );
 
-      if (error) {
-        console.error("Edge function error:", error);
-        toast.error("AI processing failed. You can retry.");
-      } else if (data?.success) {
-        const lang = data.language
-          ? langLabels[data.language] || data.language
-          : "";
-        const msg =
-          data.tasks_created > 0
-            ? `${lang ? lang + " detected. " : ""}${data.tasks_created} task(s) auto-generated!`
-            : `Transcribed${lang ? ` (${lang})` : ""}. No tasks extracted.`;
-        toast.success(msg);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(
+          `Processing failed (${res.status}): ${errData?.error || "Unknown error"}`
+        );
+      } else {
+        toast.success("Processing complete!");
       }
     } catch (err) {
-      console.error("Processing error:", err);
-      toast.error(
-        "AI processing failed. Edge function may not be deployed yet."
-      );
+      toast.error(`Retry failed: ${(err as Error).message}`);
     }
 
     setProcessing(null);
@@ -289,318 +330,271 @@ export default function Recordings() {
     patients.find((p) => p.id === id)?.name ?? "";
 
   return (
-    <AppLayout title="Audio → Tasks">
+    <AppLayout title="Record Shift Handoff">
       <div className="space-y-6">
-        {/* ── Quick Record Card ─────────────────────────────── */}
-        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
-                <Sparkles className="w-5 h-5 text-primary" />
+        {/* Compact Recorder */}
+        <div className="bg-card border rounded-lg p-5">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold">Record Shift Handoff</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Record your verbal shift report. AI will extract a structured
+                handoff report with patient status, vitals, risks, and to-do
+                items.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Speak in <strong>French</strong>, <strong>English</strong>, or{" "}
+                <strong>Standard Arabic</strong> for best accuracy. Darija has
+                reduced accuracy.
+              </p>
+            </div>
+
+            {/* Controls row */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5 min-w-[180px] flex-1 max-w-xs">
+                <Label className="text-xs">Patient</Label>
+                <Select
+                  value={selectedPatient}
+                  onValueChange={setSelectedPatient}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select patient..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {patients.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="flex-1 space-y-4">
-                <div>
-                  <h2 className="font-semibold text-lg">
-                    Record & Auto-Generate Tasks
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Speak in <strong>English</strong>,{" "}
-                    <strong>French</strong>, or <strong>Arabic</strong> — AI
-                    will transcribe and create tasks automatically.
-                  </p>
-                </div>
 
-                {/* Patient selector */}
-                <div className="flex flex-wrap items-end gap-3">
-                  <div className="space-y-1.5 min-w-[200px] flex-1 max-w-xs">
-                    <Label className="text-xs">Patient</Label>
-                    <Select
-                      value={selectedPatient}
-                      onValueChange={setSelectedPatient}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select patient..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {patients.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Recording controls — single row */}
-                  <div className="flex items-center gap-2">
-                    {!isRecording && !audioBlob && (
-                      <Button
-                        onClick={startRecording}
-                        disabled={!selectedPatient}
-                        className="gap-2"
-                        size="lg"
-                      >
-                        <Mic className="w-4 h-4" /> Record
-                      </Button>
-                    )}
-
-                    {isRecording && (
-                      <Button
-                        onClick={stopRecording}
-                        variant="destructive"
-                        size="lg"
-                        className="gap-2"
-                      >
-                        <MicOff className="w-4 h-4" /> Stop{" "}
-                        <span className="font-mono text-xs">
-                          {formatTime(recordingTime)}
-                        </span>
-                      </Button>
-                    )}
-
-                    {audioBlob && !isRecording && (
-                      <>
-                        <Button
-                          onClick={uploadAndProcess}
-                          disabled={uploading}
-                          size="lg"
-                          className="gap-2"
-                        >
-                          {uploading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Upload className="w-4 h-4" />
-                          )}
-                          {uploading ? "Uploading..." : "Process with AI"}
-                        </Button>
-                        <Button
-                          onClick={discardRecording}
-                          variant="ghost"
-                          size="lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Recording indicator */}
-                {isRecording && (
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                    Recording in progress — speak your notes about{" "}
-                    {patientName(selectedPatient) || "the patient"}...
-                  </div>
+              <div className="flex items-center gap-2">
+                {!isRecording && !audioBlob && (
+                  <Button
+                    onClick={startRecording}
+                    disabled={!selectedPatient}
+                    className="gap-1.5"
+                  >
+                    <Mic className="w-4 h-4" /> Record
+                  </Button>
                 )}
 
-                {/* Audio preview */}
-                {audioBlob && !isRecording && audioUrl && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <audio controls src={audioUrl} className="h-8 flex-1" />
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {isRecording && (
+                  <Button
+                    onClick={stopRecording}
+                    variant="destructive"
+                    className="gap-1.5"
+                  >
+                    <MicOff className="w-4 h-4" /> Stop{" "}
+                    <span className="font-mono text-xs">
                       {formatTime(recordingTime)}
                     </span>
-                  </div>
+                  </Button>
+                )}
+
+                {audioBlob && !isRecording && (
+                  <>
+                    <Button
+                      onClick={uploadRecording}
+                      disabled={uploading}
+                      className="gap-1.5"
+                    >
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      {uploading ? "Uploading..." : "Upload & Generate Report"}
+                    </Button>
+                    <Button onClick={discardRecording} variant="ghost" size="icon">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* ── Recordings List with Inline Tasks ─────────────── */}
-        <div className="space-y-2">
+            {/* Recording indicator */}
+            {isRecording && (
+              <div className="flex items-center gap-2 text-xs text-destructive">
+                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                Recording in progress — speak your notes about{" "}
+                {patientName(selectedPatient) || "the patient"}...
+              </div>
+            )}
+
+            {/* Audio preview */}
+            {audioBlob && !isRecording && audioUrl && (
+              <div className="flex items-center gap-3 p-2.5 bg-muted/40 rounded-md">
+                <audio controls src={audioUrl} className="h-8 flex-1" />
+                <span className="text-xs text-muted-foreground font-mono">
+                  {formatTime(recordingTime)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Recordings Table-like List */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Processed Recordings</h2>
-            <p className="text-xs text-muted-foreground">
-              {recordings.length} recording(s)
-            </p>
+            <h3 className="text-sm font-semibold">Recordings</h3>
+            <span className="text-xs text-muted-foreground">
+              {recordings.length} total
+            </span>
           </div>
 
           {recordings.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Mic className="w-10 h-10 mb-2" />
-                <p>No recordings yet</p>
-                <p className="text-xs mt-1">
-                  Select a patient above and start recording
-                </p>
-              </CardContent>
-            </Card>
+            <div className="bg-card border rounded-lg flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Mic className="w-10 h-10 mb-2 opacity-40" />
+              <p className="text-sm">No recordings yet</p>
+              <p className="text-xs mt-1">
+                Select a patient above and start recording
+              </p>
+            </div>
           ) : (
-            recordings.map((rec) => {
-              const tasks = tasksByRecording[rec.id] ?? [];
-              const isExpanded = expandedRec === rec.id;
-              const isProcessingThis = processing === rec.id;
+            <div className="bg-card border rounded-lg overflow-hidden divide-y">
+              {recordings.map((rec) => {
+                const reports = reportsByRecording[rec.id] ?? [];
+                const isExpanded = expandedRec === rec.id;
+                const isProcessingThis = processing === rec.id;
 
-              return (
-                <Collapsible
-                  key={rec.id}
-                  open={isExpanded}
-                  onOpenChange={(open) =>
-                    setExpandedRec(open ? rec.id : null)
-                  }
-                >
-                  <Card
-                    className={`transition-shadow ${isExpanded ? "shadow-md ring-1 ring-primary/20" : "hover:shadow-md"}`}
+                return (
+                  <Collapsible
+                    key={rec.id}
+                    open={isExpanded}
+                    onOpenChange={(open) =>
+                      setExpandedRec(open ? rec.id : null)
+                    }
                   >
                     <CollapsibleTrigger asChild>
-                      <CardContent className="p-4 cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          {/* Play button */}
+                      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors">
+                        {/* Play */}
+                        <button
+                          className="shrink-0 w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center hover:bg-muted transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playAudio(rec.storage_path, rec.id);
+                          }}
+                        >
+                          {playingId === rec.id ? (
+                            <Pause className="w-3.5 h-3.5" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 ml-0.5" />
+                          )}
+                        </button>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium truncate">
+                              {rec.patients?.name ?? "Unknown Patient"}
+                            </span>
+                            <span className="text-xs text-muted-foreground hidden sm:block">
+                              {new Date(rec.created_at).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {/* Status dot */}
+                            {isProcessingThis ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600">
+                                <Loader2 className="w-3 h-3 animate-spin" />{" "}
+                                Processing
+                              </span>
+                            ) : rec.processed ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                                <CheckCircle2 className="w-3 h-3" /> Processed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600">
+                                <AlertCircle className="w-3 h-3" /> Pending
+                              </span>
+                            )}
+                            {reports.length > 0 && (
+                              <span className="text-[11px] text-muted-foreground inline-flex items-center gap-0.5">
+                                <FileText className="w-3 h-3" /> Report
+                                generated
+                              </span>
+                            )}
+                            {rec.duration_seconds != null && (
+                              <span className="text-[11px] text-muted-foreground font-mono">
+                                {formatTime(rec.duration_seconds)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Retry */}
+                        {!rec.processed && !isProcessingThis && (
                           <Button
                             variant="ghost"
-                            size="icon"
-                            className="shrink-0 h-9 w-9"
+                            size="sm"
+                            className="shrink-0 text-xs gap-1 h-7"
                             onClick={(e) => {
                               e.stopPropagation();
-                              playAudio(rec.storage_path, rec.id);
+                              retryProcessing(rec.id);
                             }}
                           >
-                            {playingId === rec.id ? (
-                              <Pause className="w-4 h-4" />
-                            ) : (
-                              <Play className="w-4 h-4" />
-                            )}
+                            <RefreshCw className="w-3 h-3" /> Retry
                           </Button>
+                        )}
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium">
-                                {rec.patients?.name ?? "Unknown Patient"}
-                              </p>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(rec.created_at).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              {isProcessingThis ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-primary/15 text-primary"
-                                >
-                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                  AI Processing...
-                                </Badge>
-                              ) : rec.processed ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]"
-                                >
-                                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                                  Processed
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]"
-                                >
-                                  <AlertCircle className="w-3 h-3 mr-1" />
-                                  Pending
-                                </Badge>
-                              )}
-                              {tasks.length > 0 && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs bg-primary/10 text-primary"
-                                >
-                                  <ListTodo className="w-3 h-3 mr-1" />
-                                  {tasks.length} task(s) generated
-                                </Badge>
-                              )}
-                              {rec.duration_seconds != null && (
-                                <span className="text-xs text-muted-foreground">
-                                  {formatTime(rec.duration_seconds)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Expand indicator */}
-                          <div className="shrink-0 text-muted-foreground">
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </div>
-
-                          {/* Retry for unprocessed */}
-                          {!rec.processed && !isProcessingThis && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="shrink-0 text-xs gap-1"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                processAudio(rec.id);
-                              }}
-                            >
-                              <Sparkles className="w-3 h-3" /> Process
-                            </Button>
+                        {/* Chevron */}
+                        <span className="shrink-0 text-muted-foreground">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
                           )}
-                        </div>
-                      </CardContent>
+                        </span>
+                      </div>
                     </CollapsibleTrigger>
 
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 space-y-3 border-t pt-3">
+                      <div className="px-4 pb-4 pt-1 space-y-3 bg-muted/10">
                         {/* Transcript */}
                         {rec.transcript && (
                           <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
                               <Languages className="w-3 h-3" /> Transcript
                             </p>
-                            <div className="bg-muted/50 rounded-md p-3 text-sm leading-relaxed max-h-40 overflow-y-auto">
+                            <div className="bg-card border rounded-md p-3 text-sm leading-relaxed max-h-36 overflow-y-auto">
                               {rec.transcript}
                             </div>
                           </div>
                         )}
 
-                        {/* Generated Tasks */}
-                        {tasks.length > 0 && (
+                        {/* Generated Handoff Report */}
+                        {reports.length > 0 && (
                           <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                              <ListTodo className="w-3 h-3" /> Auto-Generated
-                              Tasks ({tasks.length})
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                              <FileText className="w-3 h-3" /> Generated
+                              Handoff Report
                             </p>
-                            <div className="space-y-1.5">
-                              {tasks.map((task) => (
-                                <div
-                                  key={task.id}
-                                  className="flex items-center gap-2 p-2 rounded-md bg-card border text-sm"
-                                >
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[10px] px-1.5 py-0 shrink-0 ${priorityStyles[task.priority]}`}
-                                  >
-                                    {task.priority}
-                                  </Badge>
-                                  <span className="flex-1 truncate font-medium">
-                                    {task.title}
-                                  </span>
-                                  {task.category && (
-                                    <span className="text-xs text-muted-foreground shrink-0">
-                                      {task.category}
-                                    </span>
-                                  )}
-                                </div>
+                            <div className="space-y-3">
+                              {reports.map((report) => (
+                                <HandoffCard
+                                  key={report.id}
+                                  report={report}
+                                />
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {rec.processed && tasks.length === 0 && (
-                          <p className="text-sm text-muted-foreground italic">
-                            No tasks were extracted from this recording.
+                        {rec.processed && reports.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic">
+                            No handoff report was generated from this recording.
                           </p>
                         )}
                       </div>
                     </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              );
-            })
+                  </Collapsible>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

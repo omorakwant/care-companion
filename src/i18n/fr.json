@@ -216,6 +216,17 @@
     "pendingLabs": "Résultats en attente",
     "todoNextNurse": "À faire pour l'infirmier(ère) suivant(e)"
   },
+  "acceptButton": {
+    "loading": "Chargement...",
+    "pendingReview": "En attente de révision",
+    "awaitingAcceptance": "En attente d'acceptation",
+    "acceptResponsibility": "J'accepte la responsabilité",
+    "accepting": "Acceptation...",
+    "handoffAccepted": "Passation acceptée",
+    "acceptedBy": "Accepté par {{name}}",
+    "acceptedAt": "le {{time}}",
+    "teamMember": "Un membre de l'équipe"
+  },
   "notFound": {
     "title": "404",
     "message": "Oups ! Page introuvable",
@@ -271,5 +282,58 @@
     "importMore": "Importer plus",
     "startOver": "Recommencer",
     "templateHint": "Conseil : Votre tableur n'a besoin que d'une colonne avec les numéros de lits. Les colonnes département et statut sont optionnelles."
+  },
+  "wound": {
+    "title": "Plaies",
+    "type": "Type de plaie",
+    "size": "Taille",
+    "healingStage": "Stade de cicatrisation",
+    "infectionSigns": "Signes d'infection",
+    "infection": {
+      "erythema": "Érythème",
+      "pus": "Pus",
+      "odor": "Odeur",
+      "warmth": "Chaleur"
+    },
+    "drainage": "Drainage",
+    "recommendations": "Recommandations",
+    "doctorNotes": "Notes du médecin",
+    "severity": "Sévérité",
+    "mild": "Légère",
+    "moderate": "Modérée",
+    "severe": "Sévère",
+    "noAnalysis": "Pas encore d'analyse IA",
+    "analyzeWithAI": "Analyser avec l'IA",
+    "analyzing": "Analyse en cours...",
+    "analysisComplete": "Analyse de la plaie terminée",
+    "analysisFailed": "Échec de l'analyse de la plaie",
+    "uploadImage": "Télécharger image de plaie",
+    "uploaded": "Image de plaie téléchargée",
+    "noWounds": "Aucune image de plaie pour ce patient",
+    "clear": "Normal",
+    "detected": "Détecté"
+  },
+  "chat": {
+    "title": "Chart Intelligent",
+    "placeholder": "Posez une question sur ce patient...",
+    "welcome": "Posez des questions sur l'historique de ce patient",
+    "welcomeHint": "Je rechercherai dans les rapports de relève pour trouver des réponses.",
+    "searching": "Recherche dans les dossiers...",
+    "answering": "Réponse en cours...",
+    "sources": "Sources",
+    "noRecords": "Aucun dossier correspondant trouvé pour ce patient.",
+    "error": "Une erreur est survenue. Veuillez réessayer."
+  },
+  "acceptButton": {
+    "loading": "Chargement...",
+    "pendingReview": "En attente de validation",
+    "awaitingAcceptance": "Ce rapport de relève n'a pas encore été accepté.",
+    "acceptResponsibility": "J'accepte la responsabilité",
+    "accepting": "Acceptation en cours...",
+    "handoffAccepted": "Relève acceptée",
+    "acceptedBy": "Accepté par",
+    "acceptedAt": "à",
+    "signatureHash": "Signature",
+    "teamMember": "Un membre de l'équipe"
   }
 }

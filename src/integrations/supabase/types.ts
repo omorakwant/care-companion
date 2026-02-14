@@ -55,6 +55,79 @@ export type Database = {
           },
         ]
       }
+      wound_entries: {
+        Row: {
+          id: string
+          patient_id: string
+          image_url: string
+          analysis_json: Record<string, unknown>
+          doctor_notes: string
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          image_url: string
+          analysis_json?: Record<string, unknown>
+          doctor_notes?: string
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          image_url?: string
+          analysis_json?: Record<string, unknown>
+          doctor_notes?: string
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wound_entries_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      handoff_acknowledgements: {
+        Row: {
+          id: string
+          handoff_id: string
+          accepted_by: string
+          accepted_at: string
+          signature_hash: string
+        }
+        Insert: {
+          id?: string
+          handoff_id: string
+          accepted_by: string
+          accepted_at?: string
+          signature_hash: string
+        }
+        Update: {
+          id?: string
+          handoff_id?: string
+          accepted_by?: string
+          accepted_at?: string
+          signature_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handoff_acknowledgements_handoff_id_fkey"
+            columns: ["handoff_id"]
+            isOneToOne: false
+            referencedRelation: "handoff_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beds: {
         Row: {
           bed_number: string

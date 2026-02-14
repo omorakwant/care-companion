@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { AcceptButton } from "@/components/handoff/AcceptButton";
 import {
   AlertTriangle,
   Brain,
@@ -241,6 +242,11 @@ export function HandoffCard({
             </ul>
           </div>
         )}
+      </div>
+
+      {/* Handoff Acceptance */}
+      <div className="px-5 pb-5">
+        <AcceptButton handoffId={report.id} />
       </div>
     </div>
   );

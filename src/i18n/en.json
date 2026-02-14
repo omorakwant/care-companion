@@ -216,6 +216,17 @@
     "pendingLabs": "Pending Labs / Results",
     "todoNextNurse": "To-Do for Next Nurse"
   },
+  "acceptButton": {
+    "loading": "Loading...",
+    "pendingReview": "Pending Review",
+    "awaitingAcceptance": "Awaiting acceptance",
+    "acceptResponsibility": "I Accept Responsibility",
+    "accepting": "Accepting...",
+    "handoffAccepted": "Handoff accepted",
+    "acceptedBy": "Accepted by {{name}}",
+    "acceptedAt": "at {{time}}",
+    "teamMember": "A team member"
+  },
   "notFound": {
     "title": "404",
     "message": "Oops! Page not found",
@@ -271,5 +282,58 @@
     "importMore": "Import More",
     "startOver": "Start Over",
     "templateHint": "Tip: Your spreadsheet just needs a column with bed numbers. Department and status columns are optional."
+  },
+  "wound": {
+    "title": "Wounds",
+    "type": "Wound Type",
+    "size": "Size",
+    "healingStage": "Healing Stage",
+    "infectionSigns": "Infection Signs",
+    "infection": {
+      "erythema": "Erythema",
+      "pus": "Pus",
+      "odor": "Odor",
+      "warmth": "Warmth"
+    },
+    "drainage": "Drainage",
+    "recommendations": "Recommendations",
+    "doctorNotes": "Doctor Notes",
+    "severity": "Severity",
+    "mild": "Mild",
+    "moderate": "Moderate",
+    "severe": "Severe",
+    "noAnalysis": "No AI analysis yet",
+    "analyzeWithAI": "Analyze with AI",
+    "analyzing": "Analyzing...",
+    "analysisComplete": "Wound analysis complete",
+    "analysisFailed": "Wound analysis failed",
+    "uploadImage": "Upload Wound Image",
+    "uploaded": "Wound image uploaded",
+    "noWounds": "No wound images for this patient",
+    "clear": "Clear",
+    "detected": "Detected"
+  },
+  "chat": {
+    "title": "Smart Chart",
+    "placeholder": "Ask about this patient...",
+    "welcome": "Ask questions about this patient's history",
+    "welcomeHint": "I'll search through handoff reports to find answers.",
+    "searching": "Searching records...",
+    "answering": "Answering...",
+    "sources": "Sources",
+    "noRecords": "No matching records found for this patient.",
+    "error": "Something went wrong. Please try again."
+  },
+  "acceptButton": {
+    "loading": "Loading...",
+    "pendingReview": "Pending Review",
+    "awaitingAcceptance": "This handoff report has not been accepted yet.",
+    "acceptResponsibility": "I Accept Responsibility",
+    "accepting": "Accepting...",
+    "handoffAccepted": "Handoff accepted",
+    "acceptedBy": "Accepted by",
+    "acceptedAt": "at",
+    "signatureHash": "Signature",
+    "teamMember": "A team member"
   }
 }

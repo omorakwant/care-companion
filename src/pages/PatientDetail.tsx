@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { AppLayout } from "@/components/AppLayout";
 import { Label } from "@/components/ui/label";
 import { HandoffCard } from "@/components/HandoffCard";
+import { WoundCard } from "@/components/patient/WoundCard";
+import { ChartChat } from "@/components/chat/ChartChat";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +37,7 @@ import {
   Mic,
   X,
   Clock,
+  Camera,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
@@ -47,15 +50,17 @@ type Bed = Tables<"beds">;
 export default function PatientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { t } = useTranslation();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [handoffs, setHandoffs] = useState<HandoffReport[]>([]);
   const [recordings, setRecordings] = useState<AudioNotice[]>([]);
+  const [wounds, setWounds] = useState<any[]>([]);
+  const [analyzingWound, setAnalyzingWound] = useState<string | null>(null);
   const [bed, setBed] = useState<Bed | null>(null);
   const [allBeds, setAllBeds] = useState<Bed[]>([]);
   const [editing, setEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"handoffs" | "recordings">(
+  const [activeTab, setActiveTab] = useState<"handoffs" | "recordings" | "wounds">(
     "handoffs"
   );
   const [form, setForm] = useState({
@@ -123,9 +128,20 @@ export default function PatientDetail() {
     setLoading(false);
   };
 
+  const fetchWounds = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("wound_entries")
+      .select("*")
+      .eq("patient_id", id)
+      .order("created_at", { ascending: false });
+    if (data) setWounds(data);
+  };
+
   useEffect(() => {
     fetchPatient();
     fetchRelated();
+    fetchWounds();
   }, [id]);
 
   const handleSave = async () => {
@@ -185,6 +201,50 @@ export default function PatientDetail() {
     }
     toast.success(t("patientDetail.bedAssigned"));
     fetchRelated();
+  };
+
+  const handleAnalyzeWound = async (woundId: string) => {
+    setAnalyzingWound(woundId);
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-wound`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ wound_entry_id: woundId }),
+        }
+      );
+      if (res.ok) {
+        toast.success(t("wound.analysisComplete"));
+        fetchWounds();
+      }
+    } catch {
+      toast.error(t("wound.analysisFailed"));
+    }
+    setAnalyzingWound(null);
+  };
+
+  const handleWoundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id || !user) return;
+    const fileName = `wounds/${id}/${Date.now()}.${file.name.split('.').pop()}`;
+    const { error: uploadError } = await supabase.storage
+      .from("audio-recordings")
+      .upload(fileName, file, { contentType: file.type });
+    if (uploadError) { toast.error(uploadError.message); return; }
+    const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName);
+    await supabase.from("wound_entries").insert({
+      patient_id: id,
+      image_url: urlData.publicUrl,
+      created_by: user.id,
+    });
+    toast.success(t("wound.uploaded"));
+    fetchWounds();
   };
 
   if (loading) {
@@ -393,6 +453,17 @@ export default function PatientDetail() {
           >
             <Mic className="w-3.5 h-3.5" /> {t('patientDetail.recordingsTab')} ({recordings.length})
           </button>
+          <button
+            onClick={() => setActiveTab("wounds")}
+            className={cn(
+              "pb-2.5 text-[12px] font-semibold flex items-center gap-1.5 border-b-2 transition-colors -mb-px",
+              activeTab === "wounds"
+                ? "border-[var(--c-primary)] text-foreground"
+                : "border-transparent text-[var(--c-text-muted)] hover:text-foreground"
+            )}
+          >
+            <Camera className="w-3.5 h-3.5" /> {t("wound.title")} ({wounds.length})
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -480,7 +551,35 @@ export default function PatientDetail() {
             )}
           </div>
         )}
+
+        {activeTab === "wounds" && (
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <label className="flex items-center gap-2 gradient-primary rounded-[10px] h-9 px-4 text-white text-[12px] font-medium hover:opacity-90 cursor-pointer transition-opacity">
+                <Camera className="w-3.5 h-3.5" /> {t("wound.uploadImage")}
+                <input type="file" accept="image/*" onChange={handleWoundUpload} className="hidden" />
+              </label>
+            </div>
+            {wounds.length === 0 ? (
+              <div className="glass-card rounded-2xl flex flex-col items-center justify-center py-12 text-[var(--c-text-muted)]">
+                <Camera className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-[13px]">{t("wound.noWounds")}</p>
+              </div>
+            ) : (
+              wounds.map((w) => (
+                <WoundCard
+                  key={w.id}
+                  entry={w}
+                  onAnalyze={handleAnalyzeWound}
+                  analyzing={analyzingWound === w.id}
+                />
+              ))
+            )}
+          </div>
+        )}
       </div>
+
+      {patient && <ChartChat patientId={patient.id} patientName={patient.name} />}
     </AppLayout>
   );
 }

@@ -35,3 +35,6 @@ final-test.cjs
 
 # Supabase temp
 supabase/.temp/
+
+# Local Netlify folder
+.netlify

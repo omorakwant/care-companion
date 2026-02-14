@@ -40,34 +40,44 @@ export function AcceptButton({ handoffId, className }: AcceptButtonProps) {
     let cancelled = false;
 
     async function fetchAcknowledgement() {
-      const { data, error } = await supabase
-        .from("handoff_acknowledgements")
-        .select("*")
-        .eq("handoff_id", handoffId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("handoff_acknowledgements")
+          .select("*")
+          .eq("handoff_id", handoffId)
+          .maybeSingle();
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (error) {
-        setState("pending");
-        return;
-      }
-
-      if (data) {
-        setAcknowledgement(data as HandoffAcknowledgement);
-        if (data.accepted_by) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("display_name")
-            .eq("user_id", data.accepted_by)
-            .single();
-          if (!cancelled && profile?.display_name) {
-            setDisplayName(profile.display_name);
-          }
+        if (error) {
+          // Table may not exist yet — show pending state
+          setState("pending");
+          return;
         }
-        setState("accepted");
-      } else {
-        setState("pending");
+
+        if (data) {
+          setAcknowledgement(data as HandoffAcknowledgement);
+          if (data.accepted_by) {
+            try {
+              const { data: profile } = await supabase
+                .from("profiles")
+                .select("display_name")
+                .eq("user_id", data.accepted_by)
+                .single();
+              if (!cancelled && profile?.display_name) {
+                setDisplayName(profile.display_name);
+              }
+            } catch {
+              // Profile lookup failed — use fallback name
+            }
+          }
+          setState("accepted");
+        } else {
+          setState("pending");
+        }
+      } catch {
+        // Table doesn't exist yet — show pending
+        if (!cancelled) setState("pending");
       }
     }
 

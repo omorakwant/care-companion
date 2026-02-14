@@ -331,8 +331,8 @@
     "acceptResponsibility": "I Accept Responsibility",
     "accepting": "Accepting...",
     "handoffAccepted": "Handoff accepted",
-    "acceptedBy": "Accepted by",
-    "acceptedAt": "at",
+    "acceptedBy": "Accepted by {{name}}",
+    "acceptedAt": "{{time}}",
     "signatureHash": "Signature",
     "teamMember": "A team member"
   }

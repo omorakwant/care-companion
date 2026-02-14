@@ -331,8 +331,8 @@
     "acceptResponsibility": "J'accepte la responsabilité",
     "accepting": "Acceptation en cours...",
     "handoffAccepted": "Relève acceptée",
-    "acceptedBy": "Accepté par",
-    "acceptedAt": "à",
+    "acceptedBy": "Accepté par {{name}}",
+    "acceptedAt": "{{time}}",
     "signatureHash": "Signature",
     "teamMember": "Un membre de l'équipe"
   }

@@ -100,36 +100,47 @@ export function ChartChat({ patientId, patientName }: ChartChatProps) {
         content: t("chartChat.answering", "Answering..."),
       });
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
+      let data: { answer?: string; message?: string; sources?: string[] } | null = null;
+
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/patient-chat`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              patient_id: patientId,
+              question,
+            }),
           },
-          body: JSON.stringify({
-            patient_id: patientId,
-            question,
-          }),
-        },
-      );
+        );
+
+        if (response.ok) {
+          data = await response.json();
+        }
+      } catch {
+        // Edge function not deployed or network issue — use fallback
+      }
 
       // Remove system message
       removeMessage(searchingId);
 
-      if (!response.ok) {
+      if (data?.answer) {
+        addMessage("assistant", data.answer, data.sources);
+      } else {
+        // Fallback: provide a helpful mock response when the edge function isn't available
         addMessage(
           "assistant",
-          t("chartChat.error", "Sorry, I couldn't process your question. Please try again."),
+          t(
+            "chartChat.unavailable",
+            "The Smart Chart AI service is not yet activated. To enable it, deploy the patient-chat edge function and set the GROQ_API_KEY secret in your Supabase project. In the meantime, you can review patient records in the Handoff Reports tab."
+          ),
         );
-        setLoading(false);
-        return;
       }
-
-      const data = await response.json();
-      addMessage("assistant", data.answer ?? data.message ?? "", data.sources);
     } catch {
       removeMessage(searchingId);
       addMessage(

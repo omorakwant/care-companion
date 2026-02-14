@@ -130,12 +130,16 @@ export default function PatientDetail() {
 
   const fetchWounds = async () => {
     if (!id) return;
-    const { data } = await supabase
-      .from("wound_entries")
-      .select("*")
-      .eq("patient_id", id)
-      .order("created_at", { ascending: false });
-    if (data) setWounds(data);
+    try {
+      const { data, error } = await supabase
+        .from("wound_entries")
+        .select("*")
+        .eq("patient_id", id)
+        .order("created_at", { ascending: false });
+      if (!error && data) setWounds(data);
+    } catch {
+      // wound_entries table may not exist yet — silently ignore
+    }
   };
 
   useEffect(() => {
@@ -232,19 +236,27 @@ export default function PatientDetail() {
   const handleWoundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !id || !user) return;
-    const fileName = `wounds/${id}/${Date.now()}.${file.name.split('.').pop()}`;
-    const { error: uploadError } = await supabase.storage
-      .from("audio-recordings")
-      .upload(fileName, file, { contentType: file.type });
-    if (uploadError) { toast.error(uploadError.message); return; }
-    const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName);
-    await supabase.from("wound_entries").insert({
-      patient_id: id,
-      image_url: urlData.publicUrl,
-      created_by: user.id,
-    });
-    toast.success(t("wound.uploaded"));
-    fetchWounds();
+    try {
+      const fileName = `wounds/${id}/${Date.now()}.${file.name.split('.').pop()}`;
+      const { error: uploadError } = await supabase.storage
+        .from("audio-recordings")
+        .upload(fileName, file, { contentType: file.type });
+      if (uploadError) { toast.error(uploadError.message); return; }
+      const { data: urlData } = supabase.storage.from("audio-recordings").getPublicUrl(fileName);
+      const { error: insertError } = await supabase.from("wound_entries").insert({
+        patient_id: id,
+        image_url: urlData.publicUrl,
+        created_by: user.id,
+      });
+      if (insertError) {
+        toast.error(insertError.message);
+        return;
+      }
+      toast.success(t("wound.uploaded"));
+      fetchWounds();
+    } catch (err) {
+      toast.error((err as Error).message || "Upload failed");
+    }
   };
 
   if (loading) {

@@ -45,7 +45,10 @@ const INFECTION_SIGNS: { key: keyof WoundAnalysis["infection_signs"]; icon: type
 
 export function WoundCard({ entry, onAnalyze, analyzing }: WoundCardProps) {
   const { t } = useTranslation();
-  const analysis = entry.analysis_json;
+  // analysis_json can be {} (empty), null, or a full WoundAnalysis
+  const raw = entry.analysis_json;
+  const analysis: WoundAnalysis | null =
+    raw && typeof raw === "object" && "wound_type" in raw ? (raw as WoundAnalysis) : null;
 
   const severityStyles: Record<string, string> = {
     mild: "bg-accent/10 text-[var(--c-accent)]",
@@ -122,7 +125,7 @@ export function WoundCard({ entry, onAnalyze, analyzing }: WoundCardProps) {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {INFECTION_SIGNS.map(({ key }) => {
-                  const detected = analysis.infection_signs[key];
+                  const detected = analysis.infection_signs?.[key] ?? false;
                   return (
                     <div
                       key={key}

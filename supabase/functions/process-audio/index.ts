@@ -50,6 +50,79 @@ async function transcribeAudio(audioBlob: Blob): Promise<TranscriptionResult> {
   };
 }
 
+// ─── Translation (Darija / Arabic → French) ─────────────────────
+
+/** ISO-639 codes that indicate Arabic (including Darija). */
+const ARABIC_CODES = new Set(["ara", "arb", "ary"]);
+
+/**
+ * Translate an Arabic / Darija transcript to French using MiniMax M2.5.
+ *
+ * Why French? Moroccan hospitals use French for medical records, and
+ * MiniMax handles French far better than Darija for task extraction.
+ *
+ * Returns the French translation, or the original text if translation fails.
+ */
+async function translateToFrench(
+  transcript: string,
+  minimaxKey: string
+): Promise<{ translated: string; didTranslate: boolean }> {
+  const systemPrompt = `You are a professional medical translator.
+
+TASK: Translate the following text from Moroccan Arabic (Darija) or Modern Standard Arabic into French.
+
+RULES:
+1. The input may be Darija (Moroccan dialect), MSA, or a mix of both with French medical terms.
+2. Preserve ALL medical terminology accurately — drug names, dosages, procedures, anatomy.
+3. If a word is already in French or Latin (medical terms), keep it as-is.
+4. Translate naturally into standard French as used in Moroccan hospitals.
+5. Do NOT add explanations, notes, or commentary.
+6. Return ONLY the French translation, nothing else.`;
+
+  try {
+    const res = await fetch("https://api.minimax.io/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${minimaxKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "MiniMax-M2.5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Translate this to French:\n\n"${transcript}"`,
+          },
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("Translation API error:", errorText);
+      return { translated: transcript, didTranslate: false };
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content?.trim() ?? "";
+
+    if (!content) {
+      console.warn("Translation returned empty — using original transcript");
+      return { translated: transcript, didTranslate: false };
+    }
+
+    console.log(
+      `Translated Arabic/Darija → French (${transcript.length} → ${content.length} chars)`
+    );
+    return { translated: content, didTranslate: true };
+  } catch (err) {
+    console.error("Translation failed:", err);
+    return { translated: transcript, didTranslate: false };
+  }
+}
+
 // ─── Task Extraction (MiniMax M2.5) ──────────────────────────────
 
 interface ExtractedTask {
@@ -61,12 +134,14 @@ interface ExtractedTask {
 
 /**
  * Extract structured medical tasks from a transcript using MiniMax M2.5.
- * The prompt handles transcripts in any language and always returns
- * task fields in the transcript's original language.
+ *
+ * Expects the transcript to be in a language MiniMax handles well
+ * (English or French). Arabic/Darija should be translated to French
+ * before calling this function.
  */
 async function extractTasks(
   transcript: string,
-  detectedLanguage: string
+  outputLanguage: string
 ): Promise<ExtractedTask[]> {
   const minimaxKey = Deno.env.get("MINIMAX_API_KEY");
   if (!minimaxKey) {
@@ -74,29 +149,18 @@ async function extractTasks(
     return [];
   }
 
-  // Map common ISO-639 codes to human-readable names for the prompt
-  const langNames: Record<string, string> = {
-    eng: "English",
-    fra: "French",
-    fre: "French",
-    ara: "Arabic",
-    arb: "Arabic",
-  };
-  const langName = langNames[detectedLanguage] ?? detectedLanguage;
-
   const systemPrompt = `You are a medical task extractor for a hospital care management system.
 
 IMPORTANT RULES:
-1. The transcript may be in English, French, Arabic, or a mix of languages.
-2. The detected language is: ${langName} (${detectedLanguage}).
-3. Write the task "title" and "description" in the SAME language as the transcript.
-4. Extract EVERY actionable medical task mentioned — medications, vitals checks, lab orders, imaging, consultations, nursing care, discharge steps, follow-ups.
-5. If the transcript is conversational or contains filler words, ignore those and focus on the medical actions.
-6. Be thorough — extract ALL tasks, even small ones like "check temperature" or "change bandage".
+1. The transcript is in ${outputLanguage}.
+2. Write the task "title" and "description" in ${outputLanguage}.
+3. Extract EVERY actionable medical task mentioned — medications, vitals checks, lab orders, imaging, consultations, nursing care, discharge steps, follow-ups.
+4. If the transcript is conversational or contains filler words, ignore those and focus on the medical actions.
+5. Be thorough — extract ALL tasks, even small ones like "check temperature" or "change bandage".
 
 Return a JSON object with a "tasks" array. Each task:
-- "title": short actionable title in the transcript's language (max 80 chars)
-- "description": detailed description in the transcript's language
+- "title": short actionable title (max 80 chars) in ${outputLanguage}
+- "description": detailed description in ${outputLanguage}
 - "priority": "low", "medium", or "high" based on clinical urgency
 - "category": one of "Medication", "Vitals", "Lab Work", "Imaging", "Consultation", "Nursing Care", "Discharge Planning", "Other"
 
@@ -188,7 +252,7 @@ serve(async (req) => {
       throw new Error(`Could not download audio: ${downloadError?.message}`);
     }
 
-    // 3. Transcribe — auto-detect language (EN / FR / AR)
+    // 3. Transcribe — auto-detect language (EN / FR / AR / Darija)
     let transcript = "";
     let detectedLanguage = "unknown";
     try {
@@ -203,13 +267,46 @@ serve(async (req) => {
       transcript = `[Transcription failed: ${(err as Error).message}]`;
     }
 
-    // 4. Extract tasks — MiniMax M2.5 (multilingual)
-    let extractedTasks: ExtractedTask[] = [];
-    if (transcript && !transcript.startsWith("[Transcription failed")) {
-      extractedTasks = await extractTasks(transcript, detectedLanguage);
+    // 4. Translate Arabic/Darija → French (hybrid approach)
+    //    Darija is poorly supported by most LLMs, so we translate to
+    //    French first. French is the medical lingua franca in Morocco.
+    let translatedTranscript = transcript;
+    let wasTranslated = false;
+    let taskLanguage = "French"; // default output language for tasks
+
+    if (
+      transcript &&
+      !transcript.startsWith("[Transcription failed") &&
+      ARABIC_CODES.has(detectedLanguage)
+    ) {
+      const minimaxKey = Deno.env.get("MINIMAX_API_KEY");
+      if (minimaxKey) {
+        console.log(
+          `Detected Arabic/Darija (${detectedLanguage}) — translating to French...`
+        );
+        const result = await translateToFrench(transcript, minimaxKey);
+        translatedTranscript = result.translated;
+        wasTranslated = result.didTranslate;
+      }
+    } else if (detectedLanguage === "eng") {
+      taskLanguage = "English";
+    } else if (
+      detectedLanguage === "fra" ||
+      detectedLanguage === "fre"
+    ) {
+      taskLanguage = "French";
+    } else {
+      // For other languages, default to French output
+      taskLanguage = "French";
     }
 
-    // 5. Update audio notice
+    // 5. Extract tasks from the (possibly translated) transcript
+    let extractedTasks: ExtractedTask[] = [];
+    if (translatedTranscript && !translatedTranscript.startsWith("[Transcription failed")) {
+      extractedTasks = await extractTasks(translatedTranscript, taskLanguage);
+    }
+
+    // 6. Update audio notice — store original transcript
     await supabase
       .from("audio_notices")
       .update({
@@ -218,7 +315,7 @@ serve(async (req) => {
       })
       .eq("id", audio_notice_id);
 
-    // 6. Create tasks in database
+    // 7. Create tasks in database
     let tasksCreated = 0;
     for (const task of extractedTasks) {
       const validPriority = ["low", "medium", "high"].includes(task.priority)
@@ -243,7 +340,10 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         transcript,
+        translated_transcript: wasTranslated ? translatedTranscript : null,
+        was_translated: wasTranslated,
         language: detectedLanguage,
+        task_language: taskLanguage,
         tasks_created: tasksCreated,
         tasks: extractedTasks,
       }),

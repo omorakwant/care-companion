@@ -1,9 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { AppLayout } from "@/components/AppLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/StatusBadge";
 import {
   Dialog,
   DialogContent,
@@ -29,8 +27,15 @@ type Bed = Tables<"beds">;
 type Patient = Tables<"patients">;
 type BedStatus = Database["public"]["Enums"]["bed_status"];
 
+const statusBorder: Record<BedStatus, string> = {
+  available: "border-accent/15",
+  occupied: "border-primary/15",
+  maintenance: "border-warning/15",
+};
+
 export default function Beds() {
-  const { role } = useAuth();
+  const { role, department } = useAuth();
+  const { t } = useTranslation();
   const [beds, setBeds] = useState<
     (Bed & { patients?: { name: string } | null })[]
   >([]);
@@ -39,7 +44,7 @@ export default function Beds() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedBed, setSelectedBed] = useState<Bed | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
-  const [form, setForm] = useState({ bed_number: "", ward: "General" });
+  const [form, setForm] = useState({ bed_number: "", ward: "A" });
   const canManage = role === "admin" || role === "receptionist";
 
   const fetchBeds = async () => {
@@ -73,9 +78,9 @@ export default function Beds() {
       toast.error(error.message);
       return;
     }
-    toast.success("Bed added");
+    toast.success(t('beds.bedAdded'));
     setDialogOpen(false);
-    setForm({ bed_number: "", ward: "General" });
+    setForm({ bed_number: "", ward: "A" });
     fetchBeds();
   };
 
@@ -86,21 +91,19 @@ export default function Beds() {
       setAssignDialogOpen(true);
       return;
     }
-
     const updates: Record<string, unknown> = { status };
     if (status !== "occupied" && bed.patient_id) {
       updates.patient_id = null;
     }
-
     const { error } = await supabase
       .from("beds")
       .update(updates)
       .eq("id", bed.id);
     if (error) {
-      toast.error("Failed to update bed: " + error.message);
+      toast.error(t('beds.updateFailed', { message: error.message }));
       return;
     }
-    toast.success(`Bed ${bed.bed_number} set to ${status}`);
+    toast.success(t('beds.statusUpdated', { bed: bed.bed_number, status }));
     fetchBeds();
   };
 
@@ -117,7 +120,7 @@ export default function Beds() {
       toast.error(error.message);
       return;
     }
-    toast.success("Patient assigned to bed");
+    toast.success(t('beds.patientAssigned'));
     setAssignDialogOpen(false);
     setSelectedBed(null);
     setSelectedPatientId("");
@@ -133,7 +136,7 @@ export default function Beds() {
       toast.error(error.message);
       return;
     }
-    toast.success("Patient unassigned");
+    toast.success(t('beds.patientUnassigned'));
     fetchBeds();
   };
 
@@ -144,172 +147,209 @@ export default function Beds() {
     (p) => !assignedPatientIds.includes(p.id)
   );
 
-  // Group beds by ward
+  // Filter beds by department for non-admin users
+  const filteredBeds = useMemo(() => {
+    if (role === "admin" || !department) return beds;
+    return beds.filter((b) => b.ward === department);
+  }, [beds, role, department]);
+
   const wardGroups = useMemo(() => {
-    const groups: Record<string, typeof beds> = {};
-    for (const bed of beds) {
+    const groups: Record<string, typeof filteredBeds> = {};
+    for (const bed of filteredBeds) {
       const ward = bed.ward || "Unassigned";
       if (!groups[ward]) groups[ward] = [];
       groups[ward].push(bed);
     }
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [beds]);
+  }, [filteredBeds]);
 
   const statusCounts = useMemo(() => {
-    const available = beds.filter((b) => b.status === "available").length;
-    const occupied = beds.filter((b) => b.status === "occupied").length;
-    const maintenance = beds.filter((b) => b.status === "maintenance").length;
-    return { available, occupied, maintenance };
-  }, [beds]);
-
-  const statusDot: Record<BedStatus, string> = {
-    available: "bg-emerald-500",
-    occupied: "bg-blue-500",
-    maintenance: "bg-amber-500",
-  };
-
-  const statusBg: Record<BedStatus, string> = {
-    available: "border-emerald-200 bg-emerald-50/50",
-    occupied: "border-blue-200 bg-blue-50/50",
-    maintenance: "border-amber-200 bg-amber-50/50",
-  };
+    const available = filteredBeds.filter((b) => b.status === "available").length;
+    const occupied = filteredBeds.filter((b) => b.status === "occupied").length;
+    const maintenance = filteredBeds.filter((b) => b.status === "maintenance").length;
+    return { available, occupied, maintenance, total: filteredBeds.length };
+  }, [filteredBeds]);
 
   return (
-    <AppLayout title="Bed Management">
-      <div className="space-y-5">
-        {/* Stats bar */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="font-medium">{statusCounts.available}</span>{" "}
-              <span className="text-muted-foreground">Available</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="font-medium">{statusCounts.occupied}</span>{" "}
-              <span className="text-muted-foreground">Occupied</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="font-medium">{statusCounts.maintenance}</span>{" "}
-              <span className="text-muted-foreground">Maintenance</span>
-            </span>
+    <AppLayout>
+      <div className="flex flex-col gap-6 p-8 lg:px-10 h-full overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-[28px] font-semibold text-foreground">
+              {t('beds.title')}
+            </h2>
+            <p className="text-xs text-[var(--c-text-muted)]">
+              {t('beds.subtitle')}
+            </p>
           </div>
           {canManage && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-1.5">
-                  <Plus className="w-3.5 h-3.5" /> Add Bed
-                </Button>
+                <button className="flex items-center gap-2 gradient-primary rounded-[10px] h-[38px] px-4 text-white text-[12px] font-medium hover:opacity-90 transition-opacity">
+                  <Plus className="w-3.5 h-3.5" /> {t('beds.addBed')}
+                </button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="bg-[var(--c-surface)] border-[var(--c-border)]">
                 <DialogHeader>
-                  <DialogTitle>Add New Bed</DialogTitle>
+                  <DialogTitle className="font-display text-lg text-foreground">
+                    {t('beds.addNewBed')}
+                  </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleCreate} className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Bed Number *</Label>
-                    <Input
+                    <Label className="text-xs text-[var(--c-text-secondary)]">
+                      {t('beds.bedNumber')} *
+                    </Label>
+                    <input
                       value={form.bed_number}
                       onChange={(e) =>
                         setForm({ ...form, bed_number: e.target.value })
                       }
                       required
-                      placeholder="e.g. A-101"
+                      placeholder={t('beds.bedNumberPlaceholder')}
+                      className="w-full h-[42px] px-4 rounded-[10px] bg-[var(--c-surface-alt)] border border-[var(--c-border)] text-foreground text-[13px] placeholder:text-[var(--c-text-dim)] focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Ward</Label>
-                    <Input
+                    <Label className="text-xs text-[var(--c-text-secondary)]">{t('beds.ward')}</Label>
+                    <input
                       value={form.ward}
                       onChange={(e) =>
                         setForm({ ...form, ward: e.target.value })
                       }
+                      className="w-full h-[42px] px-4 rounded-[10px] bg-[var(--c-surface-alt)] border border-[var(--c-border)] text-foreground text-[13px] placeholder:text-[var(--c-text-dim)] focus:outline-none focus:border-primary"
                     />
                   </div>
-                  <Button type="submit" className="w-full">
-                    Add Bed
-                  </Button>
+                  <button
+                    type="submit"
+                    className="w-full h-[42px] rounded-[10px] gradient-primary text-white text-[13px] font-semibold hover:opacity-90"
+                  >
+                    {t('beds.addBed')}
+                  </button>
                 </form>
               </DialogContent>
             </Dialog>
           )}
         </div>
 
-        {beds.length === 0 ? (
-          <div className="bg-card border rounded-lg flex flex-col items-center justify-center py-16 text-muted-foreground">
+        {/* Stat cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="glass-card rounded-xl p-4 flex flex-col gap-1.5">
+            <span className="font-display text-[28px] font-bold text-[var(--c-accent)]">
+              {statusCounts.available}
+            </span>
+            <span className="text-[10px] tracking-[1px] text-[var(--c-text-muted)] uppercase">
+              {t('beds.available')}
+            </span>
+          </div>
+          <div className="glass-card rounded-xl p-4 flex flex-col gap-1.5">
+            <span className="font-display text-[28px] font-bold text-[var(--c-primary)]">
+              {statusCounts.occupied}
+            </span>
+            <span className="text-[10px] tracking-[1px] text-[var(--c-text-muted)] uppercase">
+              {t('beds.occupied')}
+            </span>
+          </div>
+          <div className="glass-card rounded-xl p-4 flex flex-col gap-1.5">
+            <span className="font-display text-[28px] font-bold text-[var(--c-warning)]">
+              {statusCounts.maintenance}
+            </span>
+            <span className="text-[10px] tracking-[1px] text-[var(--c-text-muted)] uppercase">
+              {t('beds.maintenance')}
+            </span>
+          </div>
+          <div className="glass-card rounded-xl p-4 flex flex-col gap-1.5">
+            <span className="font-display text-[28px] font-bold text-foreground">
+              {statusCounts.total}
+            </span>
+            <span className="text-[10px] tracking-[1px] text-[var(--c-text-muted)] uppercase">
+              {t('beds.total')}
+            </span>
+          </div>
+        </div>
+
+        {/* Ward grids */}
+        {filteredBeds.length === 0 ? (
+          <div className="glass-card rounded-2xl flex flex-col items-center justify-center py-16 text-[var(--c-text-muted)]">
             <BedDouble className="w-10 h-10 mb-2 opacity-40" />
-            <p className="text-sm">No beds configured</p>
+            <p className="text-[13px]">{t('beds.noBeds')}</p>
           </div>
         ) : (
           wardGroups.map(([ward, wardBeds]) => (
-            <div key={ward} className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {ward} Ward
+            <div key={ward} className="flex flex-col gap-3">
+              <h3 className="font-display text-base font-semibold text-foreground uppercase">
+                {t('beds.ward')} {ward}
               </h3>
-              <div className="grid gap-2.5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {wardBeds.map((bed) => (
                   <div
                     key={bed.id}
                     className={cn(
-                      "border rounded-lg p-3 text-center space-y-1.5 transition-colors",
-                      statusBg[bed.status]
+                      "bg-[var(--c-surface)] rounded-xl p-4 flex flex-col gap-2.5 border",
+                      statusBorder[bed.status]
                     )}
                   >
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-medium text-foreground">
+                        {bed.bed_number}
+                      </span>
                       <span
                         className={cn(
-                          "w-2 h-2 rounded-full",
-                          statusDot[bed.status]
+                          "text-[10px] font-medium px-2 py-0.5 rounded-full",
+                          bed.status === "available" &&
+                            "bg-accent/10 text-[var(--c-accent)]",
+                          bed.status === "occupied" &&
+                            "bg-primary/10 text-[var(--c-primary)]",
+                          bed.status === "maintenance" &&
+                            "bg-warning/10 text-[var(--c-warning)]"
                         )}
-                      />
-                      <span className="font-semibold text-sm">
-                        {bed.bed_number}
+                      >
+                        {bed.status}
                       </span>
                     </div>
                     {bed.patients?.name ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <div className="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full gradient-primary flex items-center justify-center text-[8px] font-bold text-white shrink-0">
                           {bed.patients.name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-xs text-muted-foreground truncate max-w-[70px]">
+                        <span className="text-[11px] text-[var(--c-text-secondary)] truncate">
                           {bed.patients.name}
                         </span>
                       </div>
                     ) : (
-                      <p className="text-[11px] text-muted-foreground capitalize">
-                        {bed.status}
-                      </p>
+                      <span className="text-[11px] text-[var(--c-text-dim)]">
+                        {bed.status === "maintenance"
+                          ? t('beds.underMaintenance')
+                          : t('beds.empty')}
+                      </span>
                     )}
                     {canManage && (
-                      <div className="pt-1 space-y-1">
+                      <div className="flex gap-1.5 mt-1">
                         <Select
                           value={bed.status}
                           onValueChange={(v) =>
                             updateStatus(bed, v as BedStatus)
                           }
                         >
-                          <SelectTrigger className="h-6 text-[10px]">
+                          <SelectTrigger className="h-7 text-[10px] bg-[var(--c-surface-alt)] border-[var(--c-border)] text-[var(--c-text-secondary)]">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="available">Available</SelectItem>
-                            <SelectItem value="occupied">Occupied</SelectItem>
+                          <SelectContent className="bg-[var(--c-surface)] border-[var(--c-border)]">
+                            <SelectItem value="available">{t('beds.available')}</SelectItem>
+                            <SelectItem value="occupied">{t('beds.occupied')}</SelectItem>
                             <SelectItem value="maintenance">
-                              Maintenance
+                              {t('beds.maintenance')}
                             </SelectItem>
                           </SelectContent>
                         </Select>
                         {bed.patient_id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-5 text-[10px] text-muted-foreground hover:text-foreground"
+                          <button
                             onClick={() => unassignPatient(bed)}
+                            className="h-7 px-2 text-[10px] text-[var(--c-text-muted)] hover:text-foreground rounded bg-[var(--c-surface-alt)] border border-[var(--c-border)] transition-colors"
                           >
-                            Unassign
-                          </Button>
+                            {t('beds.unassign')}
+                          </button>
                         )}
                       </div>
                     )}
@@ -322,23 +362,25 @@ export default function Beds() {
 
         {/* Patient Assignment Dialog */}
         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-          <DialogContent>
+          <DialogContent className="bg-[var(--c-surface)] border-[var(--c-border)]">
             <DialogHeader>
-              <DialogTitle>
-                Assign Patient to Bed {selectedBed?.bed_number}
+              <DialogTitle className="font-display text-lg text-foreground">
+                {t('beds.assignPatient', { bed: selectedBed?.bed_number })}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs">Select Patient</Label>
+                <Label className="text-xs text-[var(--c-text-secondary)]">
+                  {t('beds.selectPatient')}
+                </Label>
                 <Select
                   value={selectedPatientId}
                   onValueChange={setSelectedPatientId}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a patient..." />
+                  <SelectTrigger className="bg-[var(--c-surface-alt)] border-[var(--c-border)] text-foreground">
+                    <SelectValue placeholder={t('beds.choosePationt')} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[var(--c-surface)] border-[var(--c-border)]">
                     {availablePatients.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
@@ -347,13 +389,13 @@ export default function Beds() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button
-                className="w-full"
+              <button
+                className="w-full h-[42px] rounded-[10px] gradient-primary text-white text-[13px] font-semibold hover:opacity-90 disabled:opacity-50"
                 onClick={handleAssignPatient}
                 disabled={!selectedPatientId}
               >
-                Assign Patient
-              </Button>
+                {t('beds.assignBtn')}
+              </button>
             </div>
           </DialogContent>
         </Dialog>

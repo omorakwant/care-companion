@@ -1,102 +1,150 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* ── Light Mode (default) ── */
   :root {
-    --background: 220 14% 97%;
-    --foreground: 220 20% 14%;
+    --background: 222 30% 96%;
+    --foreground: 224 32% 16%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 14%;
+    --card-foreground: 224 32% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 14%;
+    --popover-foreground: 224 32% 16%;
 
-    --primary: 205 80% 45%;
+    --primary: 214 38% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 94%;
-    --secondary-foreground: 220 20% 14%;
+    --secondary: 222 18% 91%;
+    --secondary-foreground: 224 32% 16%;
 
-    --muted: 220 12% 92%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 222 22% 93%;
+    --muted-foreground: 218 15% 46%;
 
-    --accent: 168 60% 38%;
+    --accent: 160 36% 40%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 68% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 90%;
-    --input: 220 13% 90%;
-    --ring: 205 80% 45%;
+    --border: 222 18% 87%;
+    --input: 222 22% 93%;
+    --ring: 214 38% 48%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 218 30% 12%;
-    --sidebar-foreground: 220 15% 88%;
-    --sidebar-primary: 205 80% 52%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 224 32% 16%;
+    --sidebar-primary: 214 38% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 218 25% 18%;
-    --sidebar-accent-foreground: 220 15% 88%;
-    --sidebar-border: 218 22% 22%;
-    --sidebar-ring: 205 80% 52%;
+    --sidebar-accent: 222 18% 93%;
+    --sidebar-accent-foreground: 224 32% 16%;
+    --sidebar-border: 222 18% 87%;
+    --sidebar-ring: 214 38% 48%;
 
-    --warning: 38 92% 50%;
+    --warning: 42 55% 45%;
     --warning-foreground: 0 0% 100%;
-    --success: 152 69% 36%;
+    --success: 160 36% 40%;
     --success-foreground: 0 0% 100%;
-    --info: 205 80% 45%;
+    --info: 200 34% 48%;
     --info-foreground: 0 0% 100%;
+
+    /* Extended semantic tokens (hex for gradients & arbitrary values) */
+    --c-surface: #FFFFFF;
+    --c-surface-alt: #EFF1F7;
+    --c-surface-hover: #E4E7F0;
+    --c-border: #DDE2ED;
+    --c-text: #1A1F36;
+    --c-text-secondary: #5E6888;
+    --c-text-muted: #8892A8;
+    --c-text-dim: #B0B8C8;
+    --c-primary: #4B72A8;
+    --c-accent: #3F957A;
+    --c-warning: #A88F30;
+    --c-info: #4B8CA8;
+    --c-purple: #6B5FA0;
+    --c-indigo: #5F5A8E;
+    --c-indigo-light: #7B78AA;
+    --c-danger: #D44444;
+    --c-danger-soft: #C45F5F;
+    --c-orange: #A87B4B;
+    --c-rose: #9E6E88;
+    --c-gradient-from: #4B72A8;
+    --c-gradient-to: #6B5FA0;
   }
 
+  /* ── Dark Mode ── */
   .dark {
-    --background: 220 20% 8%;
-    --foreground: 220 15% 93%;
+    --background: 225 20% 9%;
+    --foreground: 0 0% 100%;
 
-    --card: 220 20% 11%;
-    --card-foreground: 220 15% 93%;
+    --card: 225 17% 12%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 220 20% 11%;
-    --popover-foreground: 220 15% 93%;
+    --popover: 225 17% 12%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 205 80% 52%;
+    --primary: 218 40% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 18% 16%;
-    --secondary-foreground: 220 15% 93%;
+    --secondary: 228 20% 18%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 16% 18%;
-    --muted-foreground: 220 10% 55%;
+    --muted: 228 18% 15%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 168 60% 42%;
+    --accent: 151 29% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 45%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 16% 18%;
-    --input: 220 16% 18%;
-    --ring: 205 80% 52%;
+    --border: 228 20% 18%;
+    --input: 228 18% 15%;
+    --ring: 218 40% 58%;
 
-    --sidebar-background: 220 25% 6%;
-    --sidebar-foreground: 220 15% 88%;
-    --sidebar-primary: 205 80% 52%;
+    --sidebar-background: 225 17% 12%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 218 40% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 13%;
-    --sidebar-accent-foreground: 220 15% 88%;
-    --sidebar-border: 220 16% 15%;
-    --sidebar-ring: 205 80% 52%;
+    --sidebar-accent: 228 20% 18%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 228 20% 18%;
+    --sidebar-ring: 218 40% 58%;
 
-    --warning: 38 92% 50%;
+    --warning: 42 50% 57%;
     --warning-foreground: 0 0% 100%;
-    --success: 152 69% 42%;
+    --success: 151 29% 55%;
     --success-foreground: 0 0% 100%;
-    --info: 205 80% 52%;
+    --info: 200 35% 62%;
     --info-foreground: 0 0% 100%;
+
+    /* Extended semantic tokens (hex for gradients & arbitrary values) */
+    --c-surface: #181B25;
+    --c-surface-alt: #1D2030;
+    --c-surface-hover: #2D3244;
+    --c-border: #242838;
+    --c-text: #FFFFFF;
+    --c-text-secondary: #9CA3AF;
+    --c-text-muted: #6B7280;
+    --c-text-dim: #4E5562;
+    --c-primary: #6B8ABF;
+    --c-accent: #6BAE8E;
+    --c-warning: #C9A85C;
+    --c-info: #7BA8BF;
+    --c-purple: #8B7EB8;
+    --c-indigo: #7B78AD;
+    --c-indigo-light: #9691BD;
+    --c-danger: #EF4444;
+    --c-danger-soft: #D45F5F;
+    --c-orange: #C98B5C;
+    --c-rose: #B87EA0;
+    --c-gradient-from: #6B8ABF;
+    --c-gradient-to: #8B7EB8;
   }
 }
 
@@ -106,13 +154,37 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "cv11", "ss01";
+    @apply bg-background text-foreground antialiased;
+    font-family: 'JetBrains Mono', monospace;
     font-weight: 400;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
-    letter-spacing: -0.01em;
+    font-family: 'Oswald', sans-serif;
+    letter-spacing: 0;
+  }
+}
+
+/* Custom utilities for the design system */
+@layer utilities {
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--c-gradient-from), var(--c-gradient-to));
+  }
+
+  .gradient-primary-text {
+    background: linear-gradient(135deg, var(--c-gradient-from), var(--c-gradient-to));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass-card {
+    background: var(--c-surface);
+    border: 1px solid rgba(128, 128, 128, 0.08);
+    backdrop-filter: blur(20px);
+  }
+
+  .glass-card-hover:hover {
+    border-color: rgba(128, 128, 128, 0.15);
   }
 }

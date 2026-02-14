@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        sans: ['JetBrains Mono', 'monospace'],
+        display: ['Oswald', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -72,6 +73,31 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        /* Extended semantic tokens for theme-aware hardcoded colors */
+        surface: {
+          DEFAULT: "var(--c-surface)",
+          alt: "var(--c-surface-alt)",
+          hover: "var(--c-surface-hover)",
+        },
+        txt: {
+          DEFAULT: "var(--c-text)",
+          secondary: "var(--c-text-secondary)",
+          muted: "var(--c-text-muted)",
+          dim: "var(--c-text-dim)",
+        },
+        th: {
+          primary: "var(--c-primary)",
+          accent: "var(--c-accent)",
+          warning: "var(--c-warning)",
+          info: "var(--c-info)",
+          purple: "var(--c-purple)",
+          indigo: "var(--c-indigo)",
+          "indigo-light": "var(--c-indigo-light)",
+          danger: "var(--c-danger)",
+          "danger-soft": "var(--c-danger-soft)",
+          orange: "var(--c-orange)",
+          rose: "var(--c-rose)",
         },
       },
       borderRadius: {

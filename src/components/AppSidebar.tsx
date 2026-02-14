@@ -33,7 +33,7 @@ const menuItems = {
     { title: "Patients", icon: Users, path: "/patients" },
     { title: "Beds", icon: BedDouble, path: "/beds" },
     { title: "Tasks", icon: ListTodo, path: "/tasks" },
-    { title: "Recordings", icon: Mic, path: "/recordings" },
+    { title: "Audio → Tasks", icon: Mic, path: "/recordings" },
     { title: "User Management", icon: UserCog, path: "/admin/users" },
   ],
   receptionist: [
@@ -45,8 +45,9 @@ const menuItems = {
   staff: [
     { title: "Dashboard", icon: LayoutDashboard, path: "/" },
     { title: "Patients", icon: Users, path: "/patients" },
+    { title: "Beds", icon: BedDouble, path: "/beds" },
     { title: "Tasks", icon: ListTodo, path: "/tasks" },
-    { title: "Recordings", icon: Mic, path: "/recordings" },
+    { title: "Audio → Tasks", icon: Mic, path: "/recordings" },
   ],
 };
 

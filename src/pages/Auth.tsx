@@ -28,7 +28,7 @@ export default function Auth() {
         if (error) throw error;
         navigate("/");
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -37,7 +37,13 @@ export default function Auth() {
           },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account!");
+        // If session is returned, auto-confirm is on — go straight to dashboard
+        if (data.session) {
+          toast.success("Account created! Welcome to CareFlow.");
+          navigate("/");
+        } else {
+          toast.success("Check your email to confirm your account!");
+        }
       }
     } catch (err: any) {
       toast.error(err.message);

@@ -132,12 +132,11 @@ export function ChartChat({ patientId, patientName }: ChartChatProps) {
       if (data?.answer) {
         addMessage("assistant", data.answer, data.sources);
       } else {
-        // Fallback: provide a helpful mock response when the edge function isn't available
         addMessage(
           "assistant",
           t(
-            "chartChat.unavailable",
-            "The Smart Chart AI service is not yet activated. To enable it, deploy the patient-chat edge function and set the GROQ_API_KEY secret in your Supabase project. In the meantime, you can review patient records in the Handoff Reports tab."
+            "chat.error",
+            "Something went wrong. Please try again."
           ),
         );
       }

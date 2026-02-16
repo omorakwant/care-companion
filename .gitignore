@@ -23,9 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment files
+# Environment files — NEVER commit secrets
 .env
 .env.*
+!.env.example
 
 # Test screenshots
 e2e-screenshots/
@@ -33,8 +34,9 @@ test-screenshots/
 final-test-screenshots/
 final-test.cjs
 
-# Supabase temp
+# Supabase temp & local secrets
 supabase/.temp/
+supabase/.env
 
 # Local Netlify folder
 .netlify

@@ -9,9 +9,15 @@ SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
 DECLARE
-  base_url text := 'https://vazabyivbhzaakunjcpp.supabase.co';
-  service_key text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhemFieWl2Ymh6YWFrdW5qY3BwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTAyMjc5OSwiZXhwIjoyMDg2NTk4Nzk5fQ.XziKJATrLqI2HCIgK4aFEMNTw3_xfh1fudtMMr5AOho';
+  -- SECURITY: Read secrets from environment, never hardcode keys
+  base_url text := current_setting('app.settings.supabase_url', true);
+  service_key text := current_setting('app.settings.service_role_key', true);
 BEGIN
+  IF base_url IS NULL OR service_key IS NULL THEN
+    RAISE WARNING 'Supabase URL or service role key not configured in app.settings';
+    RETURN NEW;
+  END IF;
+
   PERFORM extensions.http_post(
     url := base_url || '/functions/v1/process-audio',
     body := jsonb_build_object('audio_notice_id', NEW.id::text),

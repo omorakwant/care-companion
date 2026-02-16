@@ -211,6 +211,11 @@ export default function PatientDetail() {
     setAnalyzingWound(woundId);
     try {
       const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        toast.error("Authentication required. Please sign in again.");
+        setAnalyzingWound(null);
+        return;
+      }
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-wound`,
         {
@@ -218,7 +223,7 @@ export default function PatientDetail() {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ wound_entry_id: woundId }),
         }

@@ -4,9 +4,12 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  VITE_SUPABASE_PROJECT_ID = "vazabyivbhzaakunjcpp"
-  VITE_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhemFieWl2Ymh6YWFrdW5qY3BwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMjI3OTksImV4cCI6MjA4NjU5ODc5OX0.01eNeU-FIqEMMT91LwCD_pTg-pAqKpt29ptKWDezfuY"
-  VITE_SUPABASE_URL = "https://vazabyivbhzaakunjcpp.supabase.co"
+  # SECURITY: Supabase credentials must be set in the Netlify dashboard
+  # under Site Settings > Environment Variables, NOT in this file.
+  # Required variables:
+  #   VITE_SUPABASE_PROJECT_ID
+  #   VITE_SUPABASE_URL
+  #   VITE_SUPABASE_PUBLISHABLE_KEY
 
 # SPA client-side routing — redirect all paths to index.html
 [[redirects]]
